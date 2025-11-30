@@ -45,6 +45,17 @@
     <section class="card">
       <div class="card-header">
         <div>
+          <h2>Dispatch workflow</h2>
+          <p class="muted">Move calls forward, attach rates, and jump to ticketing or overview.</p>
+        </div>
+        <a class="button secondary" href="operations.html">Open ticketing</a>
+      </div>
+      <div id="workflowBoard"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div>
           <h2>Dispatch task board</h2>
           <p class="muted">Outstanding calls waiting for a driver assignment.</p>
         </div>
@@ -87,7 +98,7 @@
         </div>
         <button class="rotate-roster" type="button" class="secondary">Rotate status</button>
       </div>
-      <div class="fleet-roster"></div>
+      <div id="fleet"></div>
       <details class="custom-add">
         <summary>Add truck and driver</summary>
         <form id="addFleetForm" class="custom-form two-col">
