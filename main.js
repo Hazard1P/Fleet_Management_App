@@ -525,7 +525,7 @@ function renderJobSelect() {
 }
 
 function renderSnapshot() {
-  const containers = document.querySelectorAll('.snapshot-grid');
+  const containers = document.querySelectorAll('#snapshot');
   containers.forEach((container) => {
     container.innerHTML = '';
     const active = state.jobs.length;
@@ -596,6 +596,47 @@ function renderWorkflowBoard() {
     href: 'index.html',
     className: 'button secondary',
     textContent: 'Back to overview',
+  });
+  links.append(taskLink, ticketLink, overviewLink);
+
+  container.append(steps, links);
+}
+
+function renderFleet() {
+  const containers = document.querySelectorAll('#fleet');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+
+    state.fleet.forEach((truck) => {
+      const row = createElement('div', { className: 'fleet-row' });
+      const statusMap = {
+        available: 'Available',
+        dispatched: 'Dispatched',
+        on_scene: 'On scene',
+        in_yard: 'In yard',
+      };
+
+      const statusSelect = createElement('select', { value: truck.status });
+      Object.entries(statusMap).forEach(([value, label]) => {
+        const opt = createElement('option', { value, textContent: label });
+        if (value === truck.status) opt.selected = true;
+        statusSelect.appendChild(opt);
+      });
+      statusSelect.addEventListener('change', (ev) => updateFleetStatus(truck.id, ev.target.value));
+
+      const compliance = Array.isArray(truck.compliance) ? truck.compliance.join(', ') : truck.compliance || 'N/A';
+      const contact = truck.contact ? ` · ${truck.contact}` : '';
+
+      row.append(
+        createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
+        createElement('div', { textContent: `${truck.operator}${contact}` }),
+        createElement('div', { className: 'muted', textContent: truck.location }),
+        statusSelect,
+        createElement('div', { className: 'muted', textContent: compliance }),
+        createElement('div', { className: 'fleet-actions', textContent: truck.status === 'available' ? 'Ready for call' : 'Active' }),
+      );
+      container.appendChild(row);
+    });
   });
   links.append(taskLink, ticketLink, overviewLink);
 
@@ -727,37 +768,41 @@ function attachChargesToJob(selectEl) {
 }
 
 function wireJobForm() {
-  const forms = document.querySelectorAll('.job-form');
-  forms.forEach((form) => {
-    const providerSelect = form.provider;
-    Object.keys(state.rates).forEach((provider) => {
-      const opt = createElement('option', { value: provider, textContent: provider });
-      providerSelect.appendChild(opt.cloneNode(true));
-    });
+  const form = document.querySelector('#jobForm');
+  if (!form) return;
+  const providerSelect = form.provider;
+  Object.keys(state.rates).forEach((provider) => {
+    const opt = createElement('option', { value: provider, textContent: provider });
+    providerSelect.appendChild(opt);
+  });
+}
 
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      const data = Object.fromEntries(new FormData(form));
-      const job = {
-        id: data.id.trim(),
-        customer: data.customer.trim(),
-        location: data.location.trim(),
-        provider: data.provider,
-        eta: data.eta.trim(),
-        notes: data.notes.trim(),
-        status: 'Awaiting dispatch',
-        assignedDriver: null,
-        revenue: null,
-      };
-      state.jobs.unshift(job);
-      addActivity(`${job.id} created for ${job.customer}`);
-      form.reset();
-      renderJobSelect();
-      renderSnapshot();
-      renderJobs();
-      renderDispatchTasks();
-      renderWorkflowBoard();
-    });
+function wireFleetForm() {
+  const form = document.querySelector('#addFleetForm');
+  if (!form) return;
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const compliance = (data.compliance || '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const truck = {
+      id: data.id.trim(),
+      type: data.type.trim(),
+      operator: data.operator.trim(),
+      contact: (data.contact || '').trim(),
+      status: data.status || 'available',
+      location: data.location.trim(),
+      compliance: compliance.length ? compliance : ['CVSE'],
+    };
+    state.fleet.unshift(truck);
+    addActivity(`${truck.id} added with ${truck.operator}`);
+    persistState();
+    renderFleet();
+    renderDispatchTasks();
+    renderWorkflowBoard();
   });
 }
 
