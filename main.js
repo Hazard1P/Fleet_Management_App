@@ -96,6 +96,7 @@ const baseFleet = [
     id: 'TRK-21',
     type: 'Flatbed',
     operator: 'Sam Tonks',
+    contact: '604-000-2100',
     status: 'dispatched',
     location: 'Maple Ridge yard',
     compliance: ['CVSE', 'First aid', 'PPE'],
@@ -104,6 +105,7 @@ const baseFleet = [
     id: 'TRK-14',
     type: 'Wrecker',
     operator: 'Jas Dhaliwal',
+    contact: '604-000-1400',
     status: 'dispatched',
     location: 'HWY 1 @ 232',
     compliance: ['CVSE', 'Fall protection'],
@@ -112,6 +114,7 @@ const baseFleet = [
     id: 'TRK-7',
     type: 'Service',
     operator: 'Leah Campos',
+    contact: '604-000-0700',
     status: 'in_yard',
     location: 'Pitt Meadows shop',
     compliance: ['CVSE', 'Spill kit'],
@@ -120,6 +123,7 @@ const baseFleet = [
     id: 'TRK-3',
     type: 'Motorcycle deck',
     operator: 'Wei Zhang',
+    contact: '604-000-0300',
     status: 'on_scene',
     location: 'Lougheed Hwy',
     compliance: ['CVSE', 'First aid'],
@@ -185,6 +189,19 @@ function dispatchJob(jobId, driverId) {
   renderJobs();
   renderFleet();
   renderDispatchTasks();
+  renderWorkflowBoard();
+}
+
+function updateFleetStatus(truckId, status) {
+  const truck = state.fleet.find((t) => t.id === truckId);
+  if (!truck) return;
+  truck.status = status;
+  addActivity(`${truck.id} marked ${status.replace('_', ' ')}`);
+  persistState();
+  renderFleet();
+  renderSnapshot();
+  renderDispatchTasks();
+  renderWorkflowBoard();
 }
 
 function renderDispatchTasks() {
@@ -466,144 +483,213 @@ function calculateTotal() {
 }
 
 function renderSummary() {
-  const container = document.querySelector('#summary');
-  if (!container) return;
   const { total, lines } = calculateTotal();
-  container.innerHTML = '';
+  const containers = document.querySelectorAll('.summary-panel');
+  containers.forEach((container) => {
+    container.innerHTML = '';
 
-  if (!lines.length) {
-    container.textContent = 'No line items selected yet. Check the boxes to include charges and set the quantities for per-km or per-hour lines.';
-    return;
-  }
+    if (!lines.length) {
+      container.textContent = 'No line items selected yet. Check the boxes to include charges and set the quantities for per-km or per-hour lines.';
+      return;
+    }
 
-  lines.forEach((line) => {
-    const row = createElement('div', { className: 'summary-line' });
-    const lhs = line.type === 'percent'
-      ? line.label
-      : `${line.label} ${line.type === 'flat' ? '' : `× ${line.qty}`}`.trim();
-    row.append(
-      createElement('span', { textContent: lhs }),
-      createElement('strong', { textContent: formatCurrency(line.subtotal) }),
-    );
-    container.appendChild(row);
+    lines.forEach((line) => {
+      const row = createElement('div', { className: 'summary-line' });
+      const lhs = line.type === 'percent'
+        ? line.label
+        : `${line.label} ${line.type === 'flat' ? '' : `× ${line.qty}`}`.trim();
+      row.append(
+        createElement('span', { textContent: lhs }),
+        createElement('strong', { textContent: formatCurrency(line.subtotal) }),
+      );
+      container.appendChild(row);
+    });
+
+    const totalRow = createElement('div', { className: 'total' });
+    totalRow.textContent = `Total: ${formatCurrency(total)}`;
+    container.appendChild(totalRow);
   });
-
-  const totalRow = createElement('div', { className: 'total' });
-  totalRow.textContent = `Total: ${formatCurrency(total)}`;
-  container.appendChild(totalRow);
 }
 
 function renderJobSelect() {
-  const select = document.querySelector('#jobSelect');
-  select.innerHTML = '';
-  const placeholder = createElement('option', { value: '', textContent: 'No job linked' });
-  select.appendChild(placeholder);
-  state.jobs.forEach((job) => {
-    const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
-    select.appendChild(opt);
+  const selects = document.querySelectorAll('.job-select');
+  selects.forEach((select) => {
+    select.innerHTML = '';
+    const placeholder = createElement('option', { value: '', textContent: 'No job linked' });
+    select.appendChild(placeholder);
+    state.jobs.forEach((job) => {
+      const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
+      select.appendChild(opt);
+    });
   });
 }
 
 function renderSnapshot() {
-  const container = document.querySelector('#snapshot');
-  container.innerHTML = '';
-  const active = state.jobs.length;
-  const delivered = state.jobs.filter((j) => j.status === 'Delivered').length;
-  const awaitingDispatch = state.jobs.filter((j) => j.status === 'Awaiting dispatch').length;
-  const readyFleet = state.fleet.filter((f) => f.status === 'available').length;
-  const dispatched = state.fleet.filter((f) => f.status === 'dispatched').length;
-  const revenue = state.jobs.reduce((acc, job) => acc + (job.revenue?.total || 0), 0);
+  const containers = document.querySelectorAll('.snapshot-grid');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+    const active = state.jobs.length;
+    const delivered = state.jobs.filter((j) => j.status === 'Delivered').length;
+    const awaitingDispatch = state.jobs.filter((j) => j.status === 'Awaiting dispatch').length;
+    const readyFleet = state.fleet.filter((f) => f.status === 'available').length;
+    const dispatched = state.fleet.filter((f) => f.status === 'dispatched').length;
+    const revenue = state.jobs.reduce((acc, job) => acc + (job.revenue?.total || 0), 0);
 
-  const cards = [
-    { label: 'Active jobs', value: active },
-    { label: 'Delivered today', value: delivered },
-    { label: 'Awaiting dispatch', value: awaitingDispatch },
-    { label: 'Fleet ready', value: readyFleet },
-    { label: 'Out on calls', value: dispatched },
-    { label: 'Projected revenue', value: formatCurrency(revenue) },
-  ];
+    const cards = [
+      { label: 'Active jobs', value: active },
+      { label: 'Delivered today', value: delivered },
+      { label: 'Awaiting dispatch', value: awaitingDispatch },
+      { label: 'Fleet ready', value: readyFleet },
+      { label: 'Out on calls', value: dispatched },
+      { label: 'Projected revenue', value: formatCurrency(revenue) },
+    ];
 
-  cards.forEach((card) => {
-    const item = createElement('div', { className: 'snapshot-item' });
-    item.append(
-      createElement('p', { className: 'muted', textContent: card.label }),
-      createElement('strong', { className: 'snapshot-value', textContent: card.value }),
-    );
-    container.appendChild(item);
+    cards.forEach((card) => {
+      const item = createElement('div', { className: 'snapshot-item' });
+      item.append(
+        createElement('p', { className: 'muted', textContent: card.label }),
+        createElement('strong', { className: 'snapshot-value', textContent: card.value }),
+      );
+      container.appendChild(item);
+    });
   });
 }
 
-function renderFleet() {
-  const container = document.querySelector('#fleet');
+function renderWorkflowBoard() {
+  const container = document.querySelector('#workflowBoard');
+  if (!container) return;
   container.innerHTML = '';
 
-  state.fleet.forEach((truck) => {
-    const row = createElement('div', { className: 'fleet-row' });
-    const statusMap = {
-      available: 'Available',
-      dispatched: 'Dispatched',
-      on_scene: 'On scene',
-      in_yard: 'In yard',
-    };
-    row.append(
-      createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
-      createElement('div', { textContent: truck.operator }),
-      createElement('div', { className: 'muted', textContent: truck.location }),
-      createElement('div', { className: 'status', textContent: statusMap[truck.status] || truck.status }),
-      createElement('div', { className: 'muted', textContent: truck.compliance.join(', ') }),
+  const stageOrder = ['Awaiting dispatch', 'Dispatched', 'En route', 'On scene', 'Delivered'];
+  const stageDescriptions = {
+    'Awaiting dispatch': 'Pair calls with available drivers from the task board.',
+    'Dispatched': 'Confirm routing and ETA with the assigned truck.',
+    'En route': 'Monitor progress; send updates to ticketing if delays occur.',
+    'On scene': 'Confirm safety gear and compliance before hookup.',
+    'Delivered': 'Hand off paperwork and close the ticket.',
+  };
+
+  const steps = createElement('div', { className: 'workflow-steps' });
+  stageOrder.forEach((stage) => {
+    const count = state.jobs.filter((j) => j.status === stage).length;
+    const step = createElement('div', { className: 'workflow-step' });
+    step.append(
+      createElement('div', { className: 'workflow-count', textContent: count }),
+      createElement('strong', { textContent: stage }),
+      createElement('p', { className: 'muted', textContent: stageDescriptions[stage] }),
     );
-    container.appendChild(row);
+    steps.appendChild(step);
+  });
+
+  const links = createElement('div', { className: 'workflow-links' });
+  const taskLink = createElement('a', {
+    href: '#dispatchTasks',
+    className: 'button',
+    textContent: 'View task board',
+  });
+  const ticketLink = createElement('a', {
+    href: 'operations.html',
+    className: 'button secondary',
+    textContent: 'Attach rates in ticketing',
+  });
+  const overviewLink = createElement('a', {
+    href: 'index.html',
+    className: 'button secondary',
+    textContent: 'Back to overview',
+  });
+  links.append(taskLink, ticketLink, overviewLink);
+
+  container.append(steps, links);
+}
+
+function renderFleet() {
+  const containers = document.querySelectorAll('.fleet-roster');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+
+    state.fleet.forEach((truck) => {
+      const row = createElement('div', { className: 'fleet-row' });
+      const statusMap = {
+        available: 'Available',
+        dispatched: 'Dispatched',
+        on_scene: 'On scene',
+        in_yard: 'In yard',
+      };
+
+      const statusSelect = createElement('select', { value: truck.status });
+      Object.entries(statusMap).forEach(([value, label]) => {
+        const opt = createElement('option', { value, textContent: label });
+        if (value === truck.status) opt.selected = true;
+        statusSelect.appendChild(opt);
+      });
+      statusSelect.addEventListener('change', (ev) => updateFleetStatus(truck.id, ev.target.value));
+
+      const compliance = Array.isArray(truck.compliance) ? truck.compliance.join(', ') : truck.compliance || 'N/A';
+      const contact = truck.contact ? ` · ${truck.contact}` : '';
+
+      row.append(
+        createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
+        createElement('div', { textContent: `${truck.operator}${contact}` }),
+        createElement('div', { className: 'muted', textContent: truck.location }),
+        statusSelect,
+        createElement('div', { className: 'muted', textContent: compliance }),
+        createElement('div', { className: 'fleet-actions', textContent: truck.status === 'available' ? 'Ready for call' : 'Active' }),
+      );
+      container.appendChild(row);
+    });
   });
 }
 
 function renderJobs() {
-  const container = document.querySelector('#jobBoard');
-  container.innerHTML = '';
-  const logContainer = createElement('div', { className: 'activity-log' });
-  const activityTitle = createElement('div', { className: 'activity-title', textContent: 'Activity stream' });
-  logContainer.appendChild(activityTitle);
+  const containers = document.querySelectorAll('.job-board');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+    const logContainer = createElement('div', { className: 'activity-log' });
+    const activityTitle = createElement('div', { className: 'activity-title', textContent: 'Activity stream' });
+    logContainer.appendChild(activityTitle);
 
-  state.activity.forEach((entry) => {
-    const line = createElement('div', { className: 'activity-line' });
-    line.append(
-      createElement('span', { className: 'muted', textContent: entry.timestamp }),
-      createElement('span', { textContent: entry.entry }),
-    );
-    logContainer.appendChild(line);
-  });
-
-  const list = createElement('div', { className: 'job-list' });
-  state.jobs.forEach((job) => {
-    const card = createElement('div', { className: 'job-card' });
-    const header = createElement('div', { className: 'job-card-header' });
-    header.append(
-      createElement('strong', { textContent: job.id }),
-      createElement('span', { className: 'badge', textContent: job.status }),
-    );
-    const details = createElement('div', { className: 'job-meta' });
-    details.append(
-      createElement('div', { textContent: `${job.customer} · ${job.provider}` }),
-      createElement('div', { className: 'muted', textContent: job.location }),
-      createElement('div', { className: 'muted', textContent: `ETA ${job.eta}` }),
-      createElement('div', { className: 'muted', textContent: job.notes || 'No notes' }),
-      createElement('div', {
-        className: 'muted',
-        textContent: job.assignedDriver ? `Driver: ${job.assignedDriver}` : 'No driver assigned',
-      }),
-    );
-    const actions = createElement('div', { className: 'job-actions' });
-    const nextButton = createElement('button', { type: 'button', textContent: 'Advance status' });
-    nextButton.addEventListener('click', () => advanceJob(job.id));
-    const revenue = createElement('div', {
-      className: 'muted',
-      textContent: job.revenue ? `Attached: ${formatCurrency(job.revenue.total)}` : 'No charges attached',
+    state.activity.forEach((entry) => {
+      const line = createElement('div', { className: 'activity-line' });
+      line.append(
+        createElement('span', { className: 'muted', textContent: entry.timestamp }),
+        createElement('span', { textContent: entry.entry }),
+      );
+      logContainer.appendChild(line);
     });
-    actions.append(nextButton, revenue);
-    card.append(header, details, actions);
-    list.appendChild(card);
-  });
 
-  container.append(list, logContainer);
+    const list = createElement('div', { className: 'job-list' });
+    state.jobs.forEach((job) => {
+      const card = createElement('div', { className: 'job-card' });
+      const header = createElement('div', { className: 'job-card-header' });
+      header.append(
+        createElement('strong', { textContent: job.id }),
+        createElement('span', { className: 'badge', textContent: job.status }),
+      );
+      const details = createElement('div', { className: 'job-meta' });
+      details.append(
+        createElement('div', { textContent: `${job.customer} · ${job.provider}` }),
+        createElement('div', { className: 'muted', textContent: job.location }),
+        createElement('div', { className: 'muted', textContent: `ETA ${job.eta}` }),
+        createElement('div', { className: 'muted', textContent: job.notes || 'No notes' }),
+        createElement('div', {
+          className: 'muted',
+          textContent: job.assignedDriver ? `Driver: ${job.assignedDriver}` : 'No driver assigned',
+        }),
+      );
+      const actions = createElement('div', { className: 'job-actions' });
+      const nextButton = createElement('button', { type: 'button', textContent: 'Advance status' });
+      nextButton.addEventListener('click', () => advanceJob(job.id));
+      const revenue = createElement('div', {
+        className: 'muted',
+        textContent: job.revenue ? `Attached: ${formatCurrency(job.revenue.total)}` : 'No charges attached',
+      });
+      actions.append(nextButton, revenue);
+      card.append(header, details, actions);
+      list.appendChild(card);
+    });
+
+    container.append(list, logContainer);
+  });
 }
 
 function advanceJob(jobId) {
@@ -625,10 +711,11 @@ function advanceJob(jobId) {
   renderSnapshot();
   renderJobs();
   renderDispatchTasks();
+  renderWorkflowBoard();
 }
 
-function attachChargesToJob() {
-  const jobId = document.querySelector('#jobSelect').value;
+function attachChargesToJob(selectEl) {
+  const jobId = selectEl?.value;
   if (!jobId) return;
   const job = state.jobs.find((j) => j.id === jobId);
   if (!job) return;
@@ -640,34 +727,68 @@ function attachChargesToJob() {
 }
 
 function wireJobForm() {
-  const form = document.querySelector('#jobForm');
-  const providerSelect = form.provider;
-  Object.keys(state.rates).forEach((provider) => {
-    const opt = createElement('option', { value: provider, textContent: provider });
-    providerSelect.appendChild(opt);
+  const forms = document.querySelectorAll('.job-form');
+  forms.forEach((form) => {
+    const providerSelect = form.provider;
+    Object.keys(state.rates).forEach((provider) => {
+      const opt = createElement('option', { value: provider, textContent: provider });
+      providerSelect.appendChild(opt.cloneNode(true));
+    });
+
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      const job = {
+        id: data.id.trim(),
+        customer: data.customer.trim(),
+        location: data.location.trim(),
+        provider: data.provider,
+        eta: data.eta.trim(),
+        notes: data.notes.trim(),
+        status: 'Awaiting dispatch',
+        assignedDriver: null,
+        revenue: null,
+      };
+      state.jobs.unshift(job);
+      addActivity(`${job.id} created for ${job.customer}`);
+      form.reset();
+      renderJobSelect();
+      renderSnapshot();
+      renderJobs();
+      renderDispatchTasks();
+      renderWorkflowBoard();
+    });
   });
+}
+
+function wireFleetForm() {
+  const form = document.querySelector('#addFleetForm');
+  if (!form) return;
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(form));
-    const job = {
+    const compliance = (data.compliance || '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const truck = {
       id: data.id.trim(),
-      customer: data.customer.trim(),
+      type: data.type.trim(),
+      operator: data.operator.trim(),
+      contact: (data.contact || '').trim(),
+      status: data.status || 'available',
       location: data.location.trim(),
-      provider: data.provider,
-      eta: data.eta.trim(),
-      notes: data.notes.trim(),
-      status: 'Awaiting dispatch',
-      assignedDriver: null,
-      revenue: null,
+      compliance: compliance.length ? compliance : ['CVSE'],
     };
-    state.jobs.unshift(job);
-    addActivity(`${job.id} created for ${job.customer}`);
-    form.reset();
-    renderJobSelect();
-    renderSnapshot();
-    renderJobs();
+    state.fleet.unshift(truck);
+    addActivity(`${truck.id} added with ${truck.operator}`);
+    persistState();
+    renderFleet();
     renderDispatchTasks();
+    renderSnapshot();
+    renderWorkflowBoard();
+    form.reset();
   });
 }
 
@@ -694,34 +815,40 @@ function wireControls() {
     });
   }
 
-  const recalcBtn = document.querySelector('#recalculate');
-  if (recalcBtn) {
-    recalcBtn.addEventListener('click', () => {
+  const recalcBtns = document.querySelectorAll('.recalculate');
+  recalcBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
       renderSummary();
     });
-  }
+  });
 
-  const attachBtn = document.querySelector('#attachToJob');
-  if (attachBtn) attachBtn.addEventListener('click', attachChargesToJob);
+  const attachBtns = document.querySelectorAll('.attach-to-job');
+  attachBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const scope = btn.closest('.card') || document;
+      const select = scope.querySelector('.job-select');
+      attachChargesToJob(select);
+    });
+  });
 
-  const logButton = document.querySelector('#logActivity');
-  if (logButton) {
-    logButton.addEventListener('click', () => {
+  const logButtons = document.querySelectorAll('.log-activity');
+  logButtons.forEach((button) => {
+    button.addEventListener('click', () => {
       addActivity('Security check performed via Synaptics Systems stack');
       renderJobs();
     });
-  }
+  });
 
-  const rotateBtn = document.querySelector('#rotateRoster');
-  if (rotateBtn) {
-    rotateBtn.addEventListener('click', () => {
+  const rotateBtns = document.querySelectorAll('.rotate-roster');
+  rotateBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
       if (!state.fleet.length) return;
       const last = state.fleet.pop();
       state.fleet.unshift(last);
       persistState();
       renderFleet();
     });
-  }
+  });
 
   const customItemForm = document.querySelector('#customItemForm');
   if (customItemForm) {
@@ -767,6 +894,8 @@ function init() {
   renderJobs();
   renderDispatchTasks();
   wireJobForm();
+  renderWorkflowBoard();
+  wireFleetForm();
   wireControls();
 }
 
