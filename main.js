@@ -483,41 +483,44 @@ function calculateTotal() {
 }
 
 function renderSummary() {
-  const container = document.querySelector('#summary');
-  if (!container) return;
   const { total, lines } = calculateTotal();
-  container.innerHTML = '';
+  const containers = document.querySelectorAll('.summary-panel');
+  containers.forEach((container) => {
+    container.innerHTML = '';
 
-  if (!lines.length) {
-    container.textContent = 'No line items selected yet. Check the boxes to include charges and set the quantities for per-km or per-hour lines.';
-    return;
-  }
+    if (!lines.length) {
+      container.textContent = 'No line items selected yet. Check the boxes to include charges and set the quantities for per-km or per-hour lines.';
+      return;
+    }
 
-  lines.forEach((line) => {
-    const row = createElement('div', { className: 'summary-line' });
-    const lhs = line.type === 'percent'
-      ? line.label
-      : `${line.label} ${line.type === 'flat' ? '' : `× ${line.qty}`}`.trim();
-    row.append(
-      createElement('span', { textContent: lhs }),
-      createElement('strong', { textContent: formatCurrency(line.subtotal) }),
-    );
-    container.appendChild(row);
+    lines.forEach((line) => {
+      const row = createElement('div', { className: 'summary-line' });
+      const lhs = line.type === 'percent'
+        ? line.label
+        : `${line.label} ${line.type === 'flat' ? '' : `× ${line.qty}`}`.trim();
+      row.append(
+        createElement('span', { textContent: lhs }),
+        createElement('strong', { textContent: formatCurrency(line.subtotal) }),
+      );
+      container.appendChild(row);
+    });
+
+    const totalRow = createElement('div', { className: 'total' });
+    totalRow.textContent = `Total: ${formatCurrency(total)}`;
+    container.appendChild(totalRow);
   });
-
-  const totalRow = createElement('div', { className: 'total' });
-  totalRow.textContent = `Total: ${formatCurrency(total)}`;
-  container.appendChild(totalRow);
 }
 
 function renderJobSelect() {
-  const select = document.querySelector('#jobSelect');
-  select.innerHTML = '';
-  const placeholder = createElement('option', { value: '', textContent: 'No job linked' });
-  select.appendChild(placeholder);
-  state.jobs.forEach((job) => {
-    const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
-    select.appendChild(opt);
+  const selects = document.querySelectorAll('.job-select');
+  selects.forEach((select) => {
+    select.innerHTML = '';
+    const placeholder = createElement('option', { value: '', textContent: 'No job linked' });
+    select.appendChild(placeholder);
+    state.jobs.forEach((job) => {
+      const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
+      select.appendChild(opt);
+    });
   });
 }
 
@@ -635,56 +638,99 @@ function renderFleet() {
       container.appendChild(row);
     });
   });
+  links.append(taskLink, ticketLink, overviewLink);
+
+  container.append(steps, links);
+}
+
+function renderFleet() {
+  const containers = document.querySelectorAll('.fleet-roster');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+
+    state.fleet.forEach((truck) => {
+      const row = createElement('div', { className: 'fleet-row' });
+      const statusMap = {
+        available: 'Available',
+        dispatched: 'Dispatched',
+        on_scene: 'On scene',
+        in_yard: 'In yard',
+      };
+
+      const statusSelect = createElement('select', { value: truck.status });
+      Object.entries(statusMap).forEach(([value, label]) => {
+        const opt = createElement('option', { value, textContent: label });
+        if (value === truck.status) opt.selected = true;
+        statusSelect.appendChild(opt);
+      });
+      statusSelect.addEventListener('change', (ev) => updateFleetStatus(truck.id, ev.target.value));
+
+      const compliance = Array.isArray(truck.compliance) ? truck.compliance.join(', ') : truck.compliance || 'N/A';
+      const contact = truck.contact ? ` · ${truck.contact}` : '';
+
+      row.append(
+        createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
+        createElement('div', { textContent: `${truck.operator}${contact}` }),
+        createElement('div', { className: 'muted', textContent: truck.location }),
+        statusSelect,
+        createElement('div', { className: 'muted', textContent: compliance }),
+        createElement('div', { className: 'fleet-actions', textContent: truck.status === 'available' ? 'Ready for call' : 'Active' }),
+      );
+      container.appendChild(row);
+    });
+  });
 }
 
 function renderJobs() {
-  const container = document.querySelector('#jobBoard');
-  container.innerHTML = '';
-  const logContainer = createElement('div', { className: 'activity-log' });
-  const activityTitle = createElement('div', { className: 'activity-title', textContent: 'Activity stream' });
-  logContainer.appendChild(activityTitle);
+  const containers = document.querySelectorAll('.job-board');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+    const logContainer = createElement('div', { className: 'activity-log' });
+    const activityTitle = createElement('div', { className: 'activity-title', textContent: 'Activity stream' });
+    logContainer.appendChild(activityTitle);
 
-  state.activity.forEach((entry) => {
-    const line = createElement('div', { className: 'activity-line' });
-    line.append(
-      createElement('span', { className: 'muted', textContent: entry.timestamp }),
-      createElement('span', { textContent: entry.entry }),
-    );
-    logContainer.appendChild(line);
-  });
-
-  const list = createElement('div', { className: 'job-list' });
-  state.jobs.forEach((job) => {
-    const card = createElement('div', { className: 'job-card' });
-    const header = createElement('div', { className: 'job-card-header' });
-    header.append(
-      createElement('strong', { textContent: job.id }),
-      createElement('span', { className: 'badge', textContent: job.status }),
-    );
-    const details = createElement('div', { className: 'job-meta' });
-    details.append(
-      createElement('div', { textContent: `${job.customer} · ${job.provider}` }),
-      createElement('div', { className: 'muted', textContent: job.location }),
-      createElement('div', { className: 'muted', textContent: `ETA ${job.eta}` }),
-      createElement('div', { className: 'muted', textContent: job.notes || 'No notes' }),
-      createElement('div', {
-        className: 'muted',
-        textContent: job.assignedDriver ? `Driver: ${job.assignedDriver}` : 'No driver assigned',
-      }),
-    );
-    const actions = createElement('div', { className: 'job-actions' });
-    const nextButton = createElement('button', { type: 'button', textContent: 'Advance status' });
-    nextButton.addEventListener('click', () => advanceJob(job.id));
-    const revenue = createElement('div', {
-      className: 'muted',
-      textContent: job.revenue ? `Attached: ${formatCurrency(job.revenue.total)}` : 'No charges attached',
+    state.activity.forEach((entry) => {
+      const line = createElement('div', { className: 'activity-line' });
+      line.append(
+        createElement('span', { className: 'muted', textContent: entry.timestamp }),
+        createElement('span', { textContent: entry.entry }),
+      );
+      logContainer.appendChild(line);
     });
-    actions.append(nextButton, revenue);
-    card.append(header, details, actions);
-    list.appendChild(card);
-  });
 
-  container.append(list, logContainer);
+    const list = createElement('div', { className: 'job-list' });
+    state.jobs.forEach((job) => {
+      const card = createElement('div', { className: 'job-card' });
+      const header = createElement('div', { className: 'job-card-header' });
+      header.append(
+        createElement('strong', { textContent: job.id }),
+        createElement('span', { className: 'badge', textContent: job.status }),
+      );
+      const details = createElement('div', { className: 'job-meta' });
+      details.append(
+        createElement('div', { textContent: `${job.customer} · ${job.provider}` }),
+        createElement('div', { className: 'muted', textContent: job.location }),
+        createElement('div', { className: 'muted', textContent: `ETA ${job.eta}` }),
+        createElement('div', { className: 'muted', textContent: job.notes || 'No notes' }),
+        createElement('div', {
+          className: 'muted',
+          textContent: job.assignedDriver ? `Driver: ${job.assignedDriver}` : 'No driver assigned',
+        }),
+      );
+      const actions = createElement('div', { className: 'job-actions' });
+      const nextButton = createElement('button', { type: 'button', textContent: 'Advance status' });
+      nextButton.addEventListener('click', () => advanceJob(job.id));
+      const revenue = createElement('div', {
+        className: 'muted',
+        textContent: job.revenue ? `Attached: ${formatCurrency(job.revenue.total)}` : 'No charges attached',
+      });
+      actions.append(nextButton, revenue);
+      card.append(header, details, actions);
+      list.appendChild(card);
+    });
+
+    container.append(list, logContainer);
+  });
 }
 
 function advanceJob(jobId) {
@@ -709,8 +755,8 @@ function advanceJob(jobId) {
   renderWorkflowBoard();
 }
 
-function attachChargesToJob() {
-  const jobId = document.querySelector('#jobSelect').value;
+function attachChargesToJob(selectEl) {
+  const jobId = selectEl?.value;
   if (!jobId) return;
   const job = state.jobs.find((j) => j.id === jobId);
   if (!job) return;
@@ -729,27 +775,32 @@ function wireJobForm() {
     const opt = createElement('option', { value: provider, textContent: provider });
     providerSelect.appendChild(opt);
   });
+}
+
+function wireFleetForm() {
+  const form = document.querySelector('#addFleetForm');
+  if (!form) return;
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(form));
-    const job = {
+    const compliance = (data.compliance || '')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const truck = {
       id: data.id.trim(),
-      customer: data.customer.trim(),
+      type: data.type.trim(),
+      operator: data.operator.trim(),
+      contact: (data.contact || '').trim(),
+      status: data.status || 'available',
       location: data.location.trim(),
-      provider: data.provider,
-      eta: data.eta.trim(),
-      notes: data.notes.trim(),
-      status: 'Awaiting dispatch',
-      assignedDriver: null,
-      revenue: null,
+      compliance: compliance.length ? compliance : ['CVSE'],
     };
-    state.jobs.unshift(job);
-    addActivity(`${job.id} created for ${job.customer}`);
-    form.reset();
-    renderJobSelect();
-    renderSnapshot();
-    renderJobs();
+    state.fleet.unshift(truck);
+    addActivity(`${truck.id} added with ${truck.operator}`);
+    persistState();
+    renderFleet();
     renderDispatchTasks();
     renderWorkflowBoard();
   });
@@ -809,34 +860,40 @@ function wireControls() {
     });
   }
 
-  const recalcBtn = document.querySelector('#recalculate');
-  if (recalcBtn) {
-    recalcBtn.addEventListener('click', () => {
+  const recalcBtns = document.querySelectorAll('.recalculate');
+  recalcBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
       renderSummary();
     });
-  }
+  });
 
-  const attachBtn = document.querySelector('#attachToJob');
-  if (attachBtn) attachBtn.addEventListener('click', attachChargesToJob);
+  const attachBtns = document.querySelectorAll('.attach-to-job');
+  attachBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const scope = btn.closest('.card') || document;
+      const select = scope.querySelector('.job-select');
+      attachChargesToJob(select);
+    });
+  });
 
-  const logButton = document.querySelector('#logActivity');
-  if (logButton) {
-    logButton.addEventListener('click', () => {
+  const logButtons = document.querySelectorAll('.log-activity');
+  logButtons.forEach((button) => {
+    button.addEventListener('click', () => {
       addActivity('Security check performed via Synaptics Systems stack');
       renderJobs();
     });
-  }
+  });
 
-  const rotateBtn = document.querySelector('#rotateRoster');
-  if (rotateBtn) {
-    rotateBtn.addEventListener('click', () => {
+  const rotateBtns = document.querySelectorAll('.rotate-roster');
+  rotateBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
       if (!state.fleet.length) return;
       const last = state.fleet.pop();
       state.fleet.unshift(last);
       persistState();
       renderFleet();
     });
-  }
+  });
 
   const customItemForm = document.querySelector('#customItemForm');
   if (customItemForm) {
