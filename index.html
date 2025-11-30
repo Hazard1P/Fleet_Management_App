@@ -61,10 +61,63 @@
     <section class="card">
       <div class="card-header">
         <div>
-          <h2>Fleet pulse</h2>
-          <p class="muted">Roster and compliance pulled from shared dispatch data.</p>
+          <h2>Dispatch snapshot</h2>
+          <p class="muted">Live overview of fleet readiness, calls, and revenue.</p>
         </div>
-        <a class="button secondary" href="dispatch.html">Manage fleet</a>
+        <div class="status-pill" id="secureStatus" title="Synaptics Systems security posture">Synaptics secure</div>
+      </div>
+
+      <div id="snapshot" class="snapshot-grid"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2>Summary</h2>
+        <div class="summary-actions">
+          <button id="recalculate" type="button">Recalculate now</button>
+          <label class="job-link">
+            Attach to job
+            <select id="jobSelect"></select>
+          </label>
+          <button id="attachToJob" type="button" class="secondary">Apply to job</button>
+        </div>
+      </div>
+      <div id="fleet"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2>Active jobs</h2>
+          <p class="muted">Track dispatch flow from intake to drop-off.</p>
+        </div>
+        <button id="logActivity" type="button" class="secondary">Refresh activity</button>
+      </div>
+      <div id="jobBoard"></div>
+
+      <details class="custom-add">
+        <summary>Add new job</summary>
+        <form id="jobForm" class="custom-form two-col">
+          <label>Job ID<input name="id" required placeholder="JOB-2081" /></label>
+          <label>Customer<input name="customer" required placeholder="ICBC / retail" /></label>
+          <label>Location<input name="location" required placeholder="Highway 1 / 232 exit" /></label>
+          <label>Provider
+            <select name="provider" required></select>
+          </label>
+          <label>ETA<input name="eta" required placeholder="14:25" /></label>
+          <label>Notes<input name="notes" placeholder="Winch out, debris, etc." /></label>
+          <button type="submit">Create job</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2>Fleet roster</h2>
+          <p class="muted">Assets, operators, compliance, and readiness.</p>
+        </div>
+        <button id="rotateRoster" type="button" class="secondary">Rotate status</button>
       </div>
       <div id="fleet"></div>
     </section>
