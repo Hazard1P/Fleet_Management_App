@@ -30,6 +30,7 @@ body {
 
 h1 { margin: 0; font-size: clamp(24px, 4vw, 34px); }
 .subtitle { margin: 6px 0 0; color: var(--muted); }
+.muted { color: var(--muted); }
 
 .badge {
   padding: 10px 14px;
@@ -65,6 +66,66 @@ h1 { margin: 0; font-size: clamp(24px, 4vw, 34px); }
 }
 
 .card h2 { margin: 0; font-size: 20px; }
+
+.summary-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.job-link { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.job-link select { min-width: 180px; }
+.status-pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.08);
+  font-weight: 700;
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.snapshot-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.snapshot-value { font-size: 24px; }
+
+.job-list { display: grid; gap: 10px; }
+.job-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.job-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.job-meta { display: grid; gap: 4px; margin-bottom: 6px; }
+.job-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.activity-log {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 14px;
+}
+.activity-title { font-weight: 700; margin-bottom: 6px; }
+.activity-line { display: flex; gap: 8px; align-items: center; padding: 2px 0; }
+
+.fleet-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(80px, 1fr));
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fleet-row:last-child { border-bottom: none; }
+.fleet-id { font-weight: 700; }
+.status { color: var(--accent); font-weight: 700; }
+
+.two-col { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
 .provider-select label { display: block; color: var(--muted); margin-bottom: 4px; }
 .provider-select select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: #0b1220; color: var(--text); }
