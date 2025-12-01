@@ -90,6 +90,7 @@ const state = {
   fleet: [],
   jobs: [],
   activity: [],
+  lastSavedAt: null,
 };
 
 const baseFleet = [
@@ -305,6 +306,7 @@ function loadState() {
 
 function persistState() {
   try {
+    state.lastSavedAt = new Date().toISOString();
     const payload = {
       provider: state.provider,
       rates: state.rates,
@@ -313,8 +315,10 @@ function persistState() {
       fleet: state.fleet,
       jobs: state.jobs,
       activity: state.activity,
+      lastSavedAt: state.lastSavedAt,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    renderDataEntryMeta();
   } catch (err) {
     console.warn('Unable to persist shared state', err);
   }
@@ -329,6 +333,13 @@ function createElement(tag, options = {}) {
 function formatCurrency(value) {
   if (Number.isNaN(value)) return '$0.00';
   return value.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return 'Not yet saved';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Not yet saved';
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 function getSelection(provider, key) {
@@ -556,6 +567,42 @@ function renderSnapshot() {
         createElement('strong', { className: 'snapshot-value', textContent: card.value }),
       );
       container.appendChild(item);
+    });
+  });
+}
+
+function renderDataEntryMeta() {
+  const containers = document.querySelectorAll('.data-entry-meta');
+  containers.forEach((container) => {
+    container.innerHTML = '';
+
+    const storageSizeKb = Math.round((JSON.stringify(state).length / 1024) * 10) / 10;
+    const rows = [
+      {
+        label: 'Last synced',
+        value: formatTimestamp(state.lastSavedAt),
+        tag: 'Local + offline cache',
+      },
+      {
+        label: 'Jobs and fleet',
+        value: `${state.jobs.length} jobs · ${state.fleet.length} units`,
+        tag: 'Shared across pages',
+      },
+      {
+        label: 'Storage footprint',
+        value: `${storageSizeKb} KB cached`,
+        tag: 'Ready for offline',
+      },
+    ];
+
+    rows.forEach((row) => {
+      const stat = createElement('div', { className: 'data-stat' });
+      stat.append(
+        createElement('p', { className: 'muted', textContent: row.label }),
+        createElement('strong', { textContent: row.value }),
+        createElement('span', { className: 'pill muted-pill', textContent: row.tag }),
+      );
+      container.appendChild(stat);
     });
   });
 }
@@ -801,34 +848,34 @@ function wireJobForm() {
     const opt = createElement('option', { value: provider, textContent: provider });
     providerSelect.appendChild(opt);
   });
-}
-
-function wireFleetForm() {
-  const form = document.querySelector('#addFleetForm');
-  if (!form) return;
+  providerSelect.value = state.provider;
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(form));
-    const compliance = (data.compliance || '')
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean);
-    const truck = {
+    const job = {
       id: data.id.trim(),
-      type: data.type.trim(),
-      operator: data.operator.trim(),
-      contact: (data.contact || '').trim(),
-      status: data.status || 'available',
+      customer: data.customer.trim(),
       location: data.location.trim(),
-      compliance: compliance.length ? compliance : ['CVSE'],
+      provider: data.provider || state.provider,
+      eta: data.eta.trim(),
+      notes: (data.notes || '').trim(),
+      status: 'Awaiting dispatch',
+      assignedDriver: null,
+      invoiceStatus: 'Draft',
+      revenue: null,
     };
-    state.fleet.unshift(truck);
-    addActivity(`${truck.id} added with ${truck.operator}`);
+    state.jobs.unshift(job);
+    state.invoiceJobId = state.invoiceJobId || job.id;
+    addActivity(`${job.id} created for ${job.customer}`);
     persistState();
-    renderFleet();
+    renderJobs();
+    renderSnapshot();
+    renderJobSelect();
+    renderInvoice();
     renderDispatchTasks();
     renderWorkflowBoard();
+    form.reset();
   });
 }
 
@@ -947,12 +994,14 @@ function hydrateState() {
     state.fleet = stored.fleet || cloneRates({ baseFleet }).baseFleet || baseFleet;
     state.jobs = stored.jobs || cloneRates({ baseJobs }).baseJobs || baseJobs;
     state.activity = stored.activity || [];
+    state.lastSavedAt = stored.lastSavedAt || state.lastSavedAt;
     return;
   }
 
   state.fleet = cloneRates({ baseFleet }).baseFleet || baseFleet;
   state.jobs = cloneRates({ baseJobs }).baseJobs || baseJobs;
   state.invoiceJobId = state.jobs[0]?.id || null;
+  state.lastSavedAt = state.lastSavedAt || new Date().toISOString();
 }
 
 function init() {
@@ -961,6 +1010,7 @@ function init() {
   renderProviderOptions();
   renderRateTable();
   renderSummary();
+  renderDataEntryMeta();
   renderJobSelect();
   renderInvoice();
   renderSnapshot();
