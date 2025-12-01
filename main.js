@@ -537,6 +537,84 @@ function renderJobSelect() {
       const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
       select.appendChild(opt);
     });
+    if (state.invoiceJobId) {
+      select.value = state.invoiceJobId;
+    }
+    select.onchange = (ev) => {
+      state.invoiceJobId = ev.target.value || state.invoiceJobId;
+      persistState();
+      renderInvoice();
+    };
+  });
+}
+
+function getInvoiceJob() {
+  const job = state.jobs.find((j) => j.id === state.invoiceJobId);
+  return job || state.jobs[0] || null;
+}
+
+function renderInvoice() {
+  const job = getInvoiceJob();
+  if (job && !state.invoiceJobId) state.invoiceJobId = job.id;
+
+  const metaContainers = document.querySelectorAll('.invoice-card .snapshot-grid');
+  metaContainers.forEach((container) => {
+    container.innerHTML = '';
+    if (!job) {
+      container.textContent = 'No jobs available yet. Add a job to begin invoicing.';
+      return;
+    }
+
+    const rows = [
+      { label: 'Job ID', value: job.id, tag: job.status },
+      { label: 'Provider', value: job.provider, tag: 'Rate sheet' },
+      { label: 'Invoice status', value: job.invoiceStatus || 'Draft', tag: job.assignedDriver ? job.assignedDriver : 'Unassigned' },
+    ];
+
+    rows.forEach((row) => {
+      const stat = createElement('div', { className: 'snapshot-item' });
+      stat.append(
+        createElement('p', { className: 'muted', textContent: row.label }),
+        createElement('strong', { textContent: row.value }),
+        createElement('span', { className: 'pill muted-pill', textContent: row.tag }),
+      );
+      container.appendChild(stat);
+    });
+  });
+
+  const invoiceDetails = document.querySelectorAll('.invoice-job');
+  invoiceDetails.forEach((container) => {
+    container.innerHTML = '';
+    if (!job) {
+      container.textContent = 'Select or create a job to attach charges.';
+      return;
+    }
+
+    const header = createElement('div', { className: 'job-card-header' });
+    header.append(
+      createElement('strong', { textContent: job.id }),
+      createElement('span', { className: 'badge', textContent: job.invoiceStatus || 'Draft' }),
+    );
+
+    const details = createElement('div', { className: 'job-meta' });
+    details.append(
+      createElement('div', { textContent: `${job.customer} · ${job.provider}` }),
+      createElement('div', { className: 'muted', textContent: job.location }),
+      createElement('div', { className: 'muted', textContent: job.assignedDriver ? `Driver: ${job.assignedDriver}` : 'No driver assigned' }),
+    );
+
+    const revenueRow = createElement('div', { className: 'summary-line' });
+    revenueRow.append(
+      createElement('span', { textContent: 'Attached charges' }),
+      createElement('strong', { textContent: job.revenue ? formatCurrency(job.revenue.total) : 'None yet' }),
+    );
+
+    container.append(header, details, revenueRow);
+  });
+
+  const jobSelects = document.querySelectorAll('.job-select');
+  jobSelects.forEach((select) => {
+    if (job?.id) select.value = job.id;
   });
 }
 
@@ -655,48 +733,7 @@ function renderWorkflowBoard() {
 }
 
 function renderFleet() {
-  const containers = document.querySelectorAll('#fleet');
-  containers.forEach((container) => {
-    container.innerHTML = '';
-
-    state.fleet.forEach((truck) => {
-      const row = createElement('div', { className: 'fleet-row' });
-      const statusMap = {
-        available: 'Available',
-        dispatched: 'Dispatched',
-        on_scene: 'On scene',
-        in_yard: 'In yard',
-      };
-
-      const statusSelect = createElement('select', { value: truck.status });
-      Object.entries(statusMap).forEach(([value, label]) => {
-        const opt = createElement('option', { value, textContent: label });
-        if (value === truck.status) opt.selected = true;
-        statusSelect.appendChild(opt);
-      });
-      statusSelect.addEventListener('change', (ev) => updateFleetStatus(truck.id, ev.target.value));
-
-      const compliance = Array.isArray(truck.compliance) ? truck.compliance.join(', ') : truck.compliance || 'N/A';
-      const contact = truck.contact ? ` · ${truck.contact}` : '';
-
-      row.append(
-        createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
-        createElement('div', { textContent: `${truck.operator}${contact}` }),
-        createElement('div', { className: 'muted', textContent: truck.location }),
-        statusSelect,
-        createElement('div', { className: 'muted', textContent: compliance }),
-        createElement('div', { className: 'fleet-actions', textContent: truck.status === 'available' ? 'Ready for call' : 'Active' }),
-      );
-      container.appendChild(row);
-    });
-  });
-  links.append(taskLink, ticketLink, overviewLink);
-
-  container.append(steps, links);
-}
-
-function renderFleet() {
-  const containers = document.querySelectorAll('.fleet-roster');
+  const containers = document.querySelectorAll('.fleet-roster, #fleet');
   containers.forEach((container) => {
     container.innerHTML = '';
 
@@ -825,6 +862,7 @@ function attachChargesToJob(selectEl) {
   job.invoiceStatus = job.invoiceStatus || 'Draft';
   job.revenue = { total, lines, provider: state.provider };
   addActivity(`${job.id} updated with ${formatCurrency(total)} from ${state.provider}`);
+  persistState();
   renderJobs();
   renderSnapshot();
   renderInvoice();
@@ -835,6 +873,7 @@ function updateInvoiceStatus(status) {
   if (!job) return;
   job.invoiceStatus = status;
   addActivity(`${job.id} marked ${status.toLowerCase()}`);
+  persistState();
   renderInvoice();
   renderJobs();
   renderSnapshot();
@@ -965,6 +1004,17 @@ function wireControls() {
       state.fleet.unshift(last);
       persistState();
       renderFleet();
+      renderSnapshot();
+      renderDispatchTasks();
+      renderWorkflowBoard();
+    });
+  });
+
+  const invoiceStatusButtons = document.querySelectorAll('.mark-invoiced, .mark-paid');
+  invoiceStatusButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const status = btn.classList.contains('mark-paid') ? 'Paid' : 'Invoiced';
+      updateInvoiceStatus(status);
     });
   });
 
