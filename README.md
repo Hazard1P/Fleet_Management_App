@@ -1,6 +1,6 @@
-# Tonks Towing Rate Calculator
+# Towing Rate Calculator
 
-Offline-friendly single-page calculator for the Tonks Towing rate sheet. The app ships with the rate values from the provided sheet (BCAA, SYKES, and Park & Fly) and lets dispatchers edit numbers, add custom lines, and compute totals with per-km or per-hour quantities.
+Offline-friendly single-page calculator for the Towing rate sheet. The app ships with the rate values from the provided sheet (BCAA, SYKES, and Park & Fly) and lets dispatchers edit numbers, add custom lines, and compute totals with per-km or per-hour quantities.
 
 ## Usage
 1. Open `index.html` in a modern browser (no build step required).
