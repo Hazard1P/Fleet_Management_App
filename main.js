@@ -880,47 +880,41 @@ function updateInvoiceStatus(status) {
 }
 
 function wireJobForm() {
-  const forms = document.querySelectorAll('.job-form');
-  if (!forms.length) return;
+  const form = document.querySelector('#jobForm');
+  if (!form) return;
+  const providerSelect = form.provider;
+  Object.keys(state.rates).forEach((provider) => {
+    const opt = createElement('option', { value: provider, textContent: provider });
+    providerSelect.appendChild(opt);
+  });
+  providerSelect.value = state.provider;
 
-  forms.forEach((form) => {
-    const providerSelect = form.provider;
-    if (providerSelect) {
-      providerSelect.innerHTML = '';
-      Object.keys(state.rates).forEach((provider) => {
-        const opt = createElement('option', { value: provider, textContent: provider });
-        providerSelect.appendChild(opt);
-      });
-      providerSelect.value = state.provider;
-    }
-
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      const data = Object.fromEntries(new FormData(form));
-      const job = {
-        id: data.id.trim(),
-        customer: data.customer.trim(),
-        location: data.location.trim(),
-        provider: data.provider || state.provider,
-        eta: data.eta.trim(),
-        notes: (data.notes || '').trim(),
-        status: 'Awaiting dispatch',
-        assignedDriver: null,
-        invoiceStatus: 'Draft',
-        revenue: null,
-      };
-      state.jobs.unshift(job);
-      state.invoiceJobId = state.invoiceJobId || job.id;
-      addActivity(`${job.id} created for ${job.customer}`);
-      persistState();
-      renderJobs();
-      renderSnapshot();
-      renderJobSelect();
-      renderInvoice();
-      renderDispatchTasks();
-      renderWorkflowBoard();
-      form.reset();
-    });
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const job = {
+      id: data.id.trim(),
+      customer: data.customer.trim(),
+      location: data.location.trim(),
+      provider: data.provider || state.provider,
+      eta: data.eta.trim(),
+      notes: (data.notes || '').trim(),
+      status: 'Awaiting dispatch',
+      assignedDriver: null,
+      invoiceStatus: 'Draft',
+      revenue: null,
+    };
+    state.jobs.unshift(job);
+    state.invoiceJobId = state.invoiceJobId || job.id;
+    addActivity(`${job.id} created for ${job.customer}`);
+    persistState();
+    renderJobs();
+    renderSnapshot();
+    renderJobSelect();
+    renderInvoice();
+    renderDispatchTasks();
+    renderWorkflowBoard();
+    form.reset();
   });
 }
 
