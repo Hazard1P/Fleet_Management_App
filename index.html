@@ -3,127 +3,143 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title> Towing Control Center</title>
+  <title>Tonks Towing | Fleet Dispatch + Billing</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="site-header">
-    <div>
-      <p class="eyebrow">Towing</p>
-      <h1>Control Center</h1>
+    <div class="brand">
+      <p class="eyebrow">Tonks Towing</p>
+      <h1>Fleet Dispatch + Billing</h1>
+      <p class="muted">One screen to intake calls, dispatch trucks, and build an invoice.</p>
     </div>
-    <nav class="nav">
-      <a class="active" href="index.html">Overview</a>
-      <a href="operations.html">Ticketing</a>
-      <a href="dispatch.html">Dispatch</a>
-    </nav>
+    <div class="header-actions">
+      <button class="primary" id="saveAll" type="button">Save workspace</button>
+      <button class="secondary" id="resetData" type="button">Reset sample data</button>
+    </div>
   </header>
 
   <main class="page">
-    <section class="hero">
+    <section class="card two-col">
       <div>
-        <p class="eyebrow">Fleet-grade visibility</p>
-        <h2>Stay ahead of calls, rates, and readiness</h2>
-        <p class="muted">Jump to ticketing for club-rate accuracy, or open dispatch for live jobs and fleet health. All pages share the same state for a seamless workflow.</p>
-        <div class="hero-actions">
-          <a class="button" href="operations.html">Open ticketing</a>
-          <a class="button secondary" href="dispatch.html">View dispatch</a>
+        <div class="card-header">
+          <div>
+            <h2>Call intake</h2>
+            <p class="muted">Log a new ticket, pick a program, and attach a driver.</p>
+          </div>
         </div>
-      </div>
-      <div class="hero-card">
-        <p class="muted">Security</p>
-        <div class="status-pill secure-status" title="Synaptics Systems security posture">Synaptics secure</div>
-        <p class="muted">Hardened by Synaptics Systems stack and replicated offline.</p>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <div>
-          <h2>Operational snapshot</h2>
-          <p class="muted">Live metrics from dispatch and fleet readiness.</p>
-        </div>
-      </div>
-      <div class="snapshot-grid"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <div>
-          <h2>Latest charges</h2>
-          <p class="muted">Most recent ticket totals carry across pages. Edit details on the ticketing screen.</p>
-        </div>
-        <a class="button secondary" href="operations.html">Adjust rates</a>
-      </div>
-      <div class="summary-panel"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <div>
-          <h2>Dispatch snapshot</h2>
-          <p class="muted">Live overview of fleet readiness, calls, and revenue.</p>
-        </div>
-        <div class="status-pill secure-status" title="Synaptics Systems security posture">Synaptics secure</div>
-      </div>
-
-      <div class="snapshot-grid"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <h2>Summary</h2>
-        <div class="summary-actions">
-          <button class="recalculate" type="button">Recalculate now</button>
-          <label class="job-link">
-            Attach to job
-            <select class="job-select"></select>
-          </label>
-          <button class="attach-to-job" type="button" class="secondary">Apply to job</button>
-        </div>
-      </div>
-      <div class="fleet-roster"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-header">
-        <div>
-          <h2>Active jobs</h2>
-          <p class="muted">Track dispatch flow from intake to drop-off.</p>
-        </div>
-        <button class="log-activity" type="button" class="secondary">Refresh activity</button>
-      </div>
-      <div class="job-board"></div>
-
-      <details class="custom-add">
-        <summary>Add new job</summary>
-        <form class="job-form custom-form two-col">
-          <label>Job ID<input name="id" required placeholder="JOB-2081" /></label>
+        <form id="jobForm" class="form-grid">
+          <label>Job ID<input name="id" required placeholder="JOB-2451" /></label>
           <label>Customer<input name="customer" required placeholder="ICBC / retail" /></label>
           <label>Location<input name="location" required placeholder="Highway 1 / 232 exit" /></label>
-          <label>Provider
-            <select name="provider" required></select>
+          <label>Program<select name="provider"></select></label>
+          <label>Assign driver<select name="driver"></select></label>
+          <label>Status
+            <select name="status">
+              <option value="Awaiting dispatch">Awaiting dispatch</option>
+              <option value="Dispatched">Dispatched</option>
+              <option value="On scene">On scene</option>
+              <option value="Complete">Complete</option>
+            </select>
           </label>
-          <label>ETA<input name="eta" required placeholder="14:25" /></label>
-          <label>Notes<input name="notes" placeholder="Winch out, debris, etc." /></label>
-          <button type="submit">Create job</button>
+          <label>Notes<input name="notes" placeholder="Winch out, traffic control, etc." /></label>
+          <label>ETA<input name="eta" placeholder="14:25" /></label>
+          <button type="submit">Add call</button>
         </form>
-      </details>
+      </div>
+      <div class="mini-card">
+        <h3>Ledger</h3>
+        <p class="muted">Every action is written to a local log for audit and CSV export.</p>
+        <div id="ledgerStats"></div>
+        <button class="secondary" id="refreshLedger" type="button">Refresh log</button>
+        <button class="secondary" id="downloadLedger" type="button">Download ledger CSV</button>
+      </div>
     </section>
 
     <section class="card">
       <div class="card-header">
         <div>
-          <h2>Fleet roster</h2>
-          <p class="muted">Assets, operators, compliance, and readiness.</p>
+          <h2>Active calls</h2>
+          <p class="muted">Quickly change dispatch state or billing status.</p>
         </div>
-        <button class="rotate-roster" type="button" class="secondary">Rotate status</button>
+        <div class="inline-actions">
+          <label>Invoice status
+            <select id="invoiceFilter">
+              <option value="all">All</option>
+              <option value="Draft">Draft</option>
+              <option value="Ready">Ready</option>
+              <option value="Paid">Paid</option>
+            </select>
+          </label>
+          <button id="exportJobCsv" class="secondary" type="button">Download job CSV</button>
+        </div>
       </div>
-      <div class="fleet-roster"></div>
+      <div class="table-shell">
+        <table class="data-table" id="jobTable">
+          <thead>
+            <tr><th>Job</th><th>Customer</th><th>Location</th><th>Program</th><th>Driver</th><th>ETA</th><th>Status</th><th>Invoice</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card two-col">
+      <div>
+        <div class="card-header">
+          <div>
+            <h2>Rate sheet</h2>
+            <p class="muted">Select the program to load the right charges.</p>
+          </div>
+          <div class="inline-actions">
+            <label>Program<select id="rateProvider"></select></label>
+            <button class="secondary" id="clearCharges" type="button">Clear ticket</button>
+          </div>
+        </div>
+        <div class="table-shell tall">
+          <table class="data-table" id="rateTable">
+            <thead>
+              <tr><th>Include</th><th>Line item</th><th class="right">Amount</th><th class="right">Units</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="mini-card">
+        <h3>Ticket totals</h3>
+        <p class="muted">Attach the totals to a job and keep dispatch and billing aligned.</p>
+        <label>Attach to job<select id="invoiceJob"></select></label>
+        <div class="totals" id="totals"></div>
+        <button class="primary" id="recalculate" type="button">Recalculate</button>
+        <button class="secondary" id="applyCharges" type="button">Apply to job</button>
+      </div>
+    </section>
+
+    <section class="card two-col">
+      <div>
+        <div class="card-header">
+          <h2>Fleet roster</h2>
+          <p class="muted">Keep track of who is free, dispatched, or wrapping up.</p>
+        </div>
+        <div class="table-shell">
+          <table class="data-table" id="fleetTable">
+            <thead><tr><th>Unit</th><th>Type</th><th>Operator</th><th>Status</th><th>Location</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="mini-card">
+        <h3>Notes</h3>
+        <ul class="muted tight-list">
+          <li>Totals and ledger entries are saved locally for offline use.</li>
+          <li>Use the invoice dropdown in the table to move calls to billing.</li>
+          <li>CSV downloads include costs, prices, and attached job data.</li>
+        </ul>
+      </div>
     </section>
   </main>
 
-  <footer class="footer">Built for field use: multi-page workflow, offline state, and Synaptics Systems protection.</footer>
+  <footer class="footer">Simple, auditable fleet management — dispatch, calculate, invoice.</footer>
   <script src="main.js"></script>
 </body>
 </html>
