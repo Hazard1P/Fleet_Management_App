@@ -422,6 +422,11 @@ function renderRateTable() {
         : formatCurrency(rate.amount),
     });
 
+    const includeToggle = createElement('input', {
+      type: 'checkbox',
+      checked: selection.include,
+    });
+
     const qtyInput = createElement('input', {
       type: 'number',
       min: '0',
@@ -435,21 +440,20 @@ function renderRateTable() {
     if (qtyLocked && !selection.qty) qtyInput.value = 1;
     qtyInput.addEventListener('input', () => {
       const qty = Number(qtyInput.value) || 0;
-      setSelection(state.provider, rate.key, { qty });
+      const include = qty > 0;
+      includeToggle.checked = include;
+      setSelection(state.provider, rate.key, { qty, include });
       renderSummary();
       persistState();
     });
 
-    const includeToggle = createElement('input', {
-      type: 'checkbox',
-      checked: selection.include,
-    });
     includeToggle.addEventListener('change', () => {
       const include = includeToggle.checked;
-      const needsUnit = (rate.type === 'flat' || rate.type === 'percent') && include && (!selection.qty || selection.qty === 0);
-      const qty = needsUnit ? 1 : selection.qty;
+      const currentQty = Number(qtyInput.value) || 0;
+      const needsUnit = qtyLocked && include && currentQty === 0;
+      const qty = include ? (needsUnit ? 1 : currentQty || 1) : 0;
+      qtyInput.value = qty;
       setSelection(state.provider, rate.key, { include, qty });
-      if (qtyLocked) qtyInput.value = qty || 1;
       renderSummary();
       persistState();
     });
