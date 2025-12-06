@@ -140,44 +140,7 @@ const baseFleet = [
   },
 ];
 
-const baseJobs = [
-  {
-    id: 'JOB-2041',
-    customer: 'BCAA member',
-    location: 'Louheed Hwy @ 203rd',
-    provider: 'BCAA',
-    eta: '12:15',
-    notes: 'Winch out, muddy shoulder',
-    status: 'Awaiting dispatch',
-    assignedDriver: null,
-    revenue: null,
-    invoiceStatus: 'Draft',
-  },
-  {
-    id: 'JOB-2042',
-    customer: 'Park and Fly',
-    location: 'YVR Economy lot',
-    provider: 'ParkAndFly',
-    eta: '12:40',
-    notes: 'Flat tire, needs dollies',
-    status: 'Dispatched',
-    assignedDriver: 'TRK-21',
-    revenue: null,
-    invoiceStatus: 'Draft',
-  },
-  {
-    id: 'JOB-2043',
-    customer: 'Retail',
-    location: 'Dewdney Trunk Rd',
-    provider: 'Sykes',
-    eta: '13:10',
-    notes: 'Motorcycle premium',
-    status: 'On scene',
-    assignedDriver: 'TRK-3',
-    revenue: null,
-    invoiceStatus: 'Draft',
-  },
-];
+const baseJobs = [];
 
 function cloneRates(rates) {
   return JSON.parse(JSON.stringify(rates));
@@ -412,6 +375,10 @@ function formatCurrency(value) {
   return value.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 }
 
+function roundCurrency(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
 function formatTimestamp(timestamp) {
   if (!timestamp) return 'Not yet saved';
   const date = new Date(timestamp);
@@ -573,14 +540,15 @@ function renderRateTable() {
   }
 }
 
-function calculateTotal() {
-  const providerRates = state.rates[state.provider] || [];
-  let baseTotal = 0;
+function calculateTotal(provider = state.provider) {
+  const providerRates = state.rates[provider] || [];
+  let baseSubtotal = 0;
+  let percentTotal = 0;
   const lines = [];
   const percentLines = [];
 
   providerRates.forEach((rate) => {
-    const sel = getSelection(state.provider, rate.key);
+    const sel = getSelection(provider, rate.key);
     if (!sel.include) return;
 
     if (rate.type === 'percent') {
@@ -588,9 +556,9 @@ function calculateTotal() {
       return;
     }
 
-    const qty = rate.type === 'flat' ? 1 : (sel.qty || 0);
-    const subtotal = qty * rate.amount;
-    baseTotal += subtotal;
+    const qty = rate.type === 'flat' ? 1 : Number(sel.qty) || 0;
+    const subtotal = roundCurrency(qty * rate.amount);
+    baseSubtotal += subtotal;
     lines.push({
       label: rate.label,
       qty: rate.type === 'flat' ? 1 : qty,
@@ -600,8 +568,11 @@ function calculateTotal() {
     });
   });
 
+  baseSubtotal = roundCurrency(baseSubtotal);
+
   percentLines.forEach(({ rate }) => {
-    const subtotal = baseTotal * rate.amount;
+    const subtotal = roundCurrency(baseSubtotal * rate.amount);
+    percentTotal += subtotal;
     lines.push({
       label: rate.label,
       qty: 1,
@@ -609,10 +580,10 @@ function calculateTotal() {
       subtotal,
       type: rate.type,
     });
-    baseTotal += subtotal;
   });
 
-  return { total: baseTotal, lines };
+  const total = roundCurrency(baseSubtotal + percentTotal);
+  return { total, lines };
 }
 
 function renderSummary() {
@@ -646,9 +617,13 @@ function renderSummary() {
 
 function renderJobSelect() {
   const selects = document.querySelectorAll('.job-select');
+  const hasJobs = state.jobs.length > 0;
   selects.forEach((select) => {
     select.innerHTML = '';
-    const placeholder = createElement('option', { value: '', textContent: 'No job linked' });
+    const placeholder = createElement('option', {
+      value: '',
+      textContent: hasJobs ? 'No job linked' : 'Add a job to link charges',
+    });
     select.appendChild(placeholder);
     state.jobs.forEach((job) => {
       const opt = createElement('option', { value: job.id, textContent: `${job.id} · ${job.customer}` });
@@ -657,11 +632,17 @@ function renderJobSelect() {
     if (state.invoiceJobId) {
       select.value = state.invoiceJobId;
     }
+    select.disabled = !hasJobs;
     select.onchange = (ev) => {
       state.invoiceJobId = ev.target.value || state.invoiceJobId;
       persistState();
       renderInvoice();
     };
+  });
+
+  const attachBtns = document.querySelectorAll('.attach-to-job');
+  attachBtns.forEach((btn) => {
+    btn.disabled = !hasJobs;
   });
 }
 
@@ -673,6 +654,13 @@ function getInvoiceJob() {
 function renderInvoice() {
   const job = getInvoiceJob();
   if (job && !state.invoiceJobId) state.invoiceJobId = job.id;
+
+  if (job && state.provider !== job.provider) {
+    state.provider = job.provider;
+    renderProviderOptions();
+    renderRateTable();
+    renderSummary();
+  }
 
   const metaContainers = document.querySelectorAll('.invoice-card .snapshot-grid');
   metaContainers.forEach((container) => {
@@ -983,6 +971,20 @@ function renderJobs() {
     });
 
     const list = createElement('div', { className: 'job-list' });
+
+    if (!state.jobs.length) {
+      const empty = createElement('div', { className: 'empty-state' });
+      empty.append(
+        createElement('h4', { textContent: 'No active calls yet' }),
+        createElement('p', {
+          className: 'muted',
+          textContent: 'Use the manual call intake form to create the first job and keep ticketing aligned.',
+        }),
+        createElement('div', { className: 'pill muted-pill', textContent: 'Preview jobs removed' }),
+      );
+      list.appendChild(empty);
+    }
+
     state.jobs.forEach((job) => {
       const card = createElement('div', { className: 'job-card' });
       const header = createElement('div', { className: 'job-card-header' });
@@ -1044,11 +1046,12 @@ function attachChargesToJob(selectEl) {
   if (!jobId) return;
   const job = state.jobs.find((j) => j.id === jobId);
   if (!job) return;
-  const { total, lines } = calculateTotal();
+  const providerUsed = job.provider || state.provider;
+  const { total, lines } = calculateTotal(providerUsed);
   state.invoiceJobId = jobId;
   job.invoiceStatus = job.invoiceStatus || 'Draft';
-  job.revenue = { total, lines, provider: state.provider };
-  addActivity(`${job.id} updated with ${formatCurrency(total)} from ${state.provider}`);
+  job.revenue = { total, lines, provider: providerUsed };
+  addActivity(`${job.id} updated with ${formatCurrency(total)} from ${providerUsed}`);
   persistState();
   renderJobs();
   renderSnapshot();
@@ -1070,7 +1073,7 @@ function exportCurrentJobCSV() {
   const job = getInvoiceJob();
   if (!job) return;
 
-  const revenue = job.revenue || calculateTotal();
+  const revenue = job.revenue || calculateTotal(job.provider || state.provider);
   const lines = revenue.lines?.length
     ? revenue.lines
     : [{ label: 'No charges attached', qty: 0, amount: 0, subtotal: 0, type: 'flat' }];
@@ -1303,17 +1306,17 @@ function hydrateState() {
     state.selection = stored.selection || state.selection;
     state.rateFilter = stored.rateFilter || state.rateFilter;
     state.showSelectedOnly = stored.showSelectedOnly || state.showSelectedOnly;
-    state.invoiceJobId = stored.invoiceJobId || state.invoiceJobId;
+    state.jobs = stored.jobs || [];
+    state.invoiceJobId = stored.invoiceJobId || state.jobs[0]?.id || state.invoiceJobId;
     state.fleet = stored.fleet || cloneRates({ baseFleet }).baseFleet || baseFleet;
-    state.jobs = stored.jobs || cloneRates({ baseJobs }).baseJobs || baseJobs;
     state.activity = stored.activity || [];
     state.lastSavedAt = stored.lastSavedAt || state.lastSavedAt;
     return;
   }
 
   state.fleet = cloneRates({ baseFleet }).baseFleet || baseFleet;
-  state.jobs = cloneRates({ baseJobs }).baseJobs || baseJobs;
-  state.invoiceJobId = state.jobs[0]?.id || null;
+  state.jobs = [];
+  state.invoiceJobId = null;
   state.lastSavedAt = state.lastSavedAt || new Date().toISOString();
 }
 
