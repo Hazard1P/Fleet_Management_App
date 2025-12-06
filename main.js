@@ -247,6 +247,75 @@ function updateFleetStatus(truckId, status) {
   renderWorkflowBoard();
 }
 
+function removeFleet(truckId) {
+  const truck = state.fleet.find((t) => t.id === truckId);
+  if (!truck) return;
+  state.fleet = state.fleet.filter((t) => t.id !== truckId);
+  state.jobs.forEach((job) => {
+    if (job.assignedDriver === truckId) {
+      job.assignedDriver = null;
+      if (job.status !== 'Delivered') job.status = 'Awaiting dispatch';
+    }
+  });
+  addActivity(`${truck.id} removed from roster`);
+  persistState();
+  renderFleet();
+  renderSnapshot();
+  renderDispatchTasks();
+  renderWorkflowBoard();
+  if (editingTruckId === truckId) resetFleetForm();
+}
+
+function startFleetEdit(truck) {
+  const form = document.querySelector('#addFleetForm');
+  if (!form || !truck) return;
+  editingTruckId = truck.id;
+  form.dataset.mode = 'edit';
+  form.querySelector('input[name="id"]').value = truck.id;
+  form.querySelector('input[name="type"]').value = truck.type;
+  form.querySelector('input[name="operator"]').value = truck.operator;
+  form.querySelector('input[name="contact"]').value = truck.contact;
+  form.querySelector('input[name="location"]').value = truck.location;
+  form.querySelector('select[name="status"]').value = truck.status;
+  form.querySelector('input[name="compliance"]').value = Array.isArray(truck.compliance)
+    ? truck.compliance.join(', ')
+    : truck.compliance || '';
+  const modeLabel = form.querySelector('.fleet-form-mode');
+  const submit = form.querySelector('button[type="submit"]');
+  if (modeLabel) modeLabel.textContent = `Editing ${truck.id}`;
+  if (submit) submit.textContent = 'Save changes';
+}
+
+function resetFleetForm() {
+  const form = document.querySelector('#addFleetForm');
+  if (!form) return;
+  form.reset();
+  form.dataset.mode = 'create';
+  editingTruckId = null;
+  const modeLabel = form.querySelector('.fleet-form-mode');
+  const submit = form.querySelector('button[type="submit"]');
+  if (modeLabel) modeLabel.textContent = 'Add truck and driver';
+  if (submit) submit.textContent = 'Add to roster';
+}
+
+function clearRoster() {
+  if (!state.fleet.length) return;
+  state.fleet = [];
+  state.jobs.forEach((job) => {
+    if (job.assignedDriver) {
+      job.assignedDriver = null;
+      if (job.status !== 'Delivered') job.status = 'Awaiting dispatch';
+    }
+  });
+  addActivity('Roster cleared to start fresh');
+  persistState();
+  renderFleet();
+  renderSnapshot();
+  renderDispatchTasks();
+  renderWorkflowBoard();
+  resetFleetForm();
+}
+
 function renderDispatchTasks() {
   const container = document.querySelector('#dispatchTasks');
   if (!container) return;
@@ -912,6 +981,20 @@ function renderFleet() {
   containers.forEach((container) => {
     container.innerHTML = '';
 
+    if (!state.fleet.length) {
+      const empty = createElement('div', { className: 'empty-state' });
+      empty.append(
+        createElement('h4', { textContent: 'No trucks on the roster' }),
+        createElement('p', {
+          className: 'muted',
+          textContent: 'Start fresh by adding trucks, drivers, and compliance tags with the form below.',
+        }),
+        createElement('div', { className: 'pill muted-pill', textContent: 'Roster cleared' }),
+      );
+      container.appendChild(empty);
+      return;
+    }
+
     state.fleet.forEach((truck) => {
       const row = createElement('div', { className: 'fleet-row' });
       const statusMap = {
@@ -931,6 +1014,20 @@ function renderFleet() {
 
       const compliance = Array.isArray(truck.compliance) ? truck.compliance.join(', ') : truck.compliance || 'N/A';
       const contact = truck.contact ? ` · ${truck.contact}` : '';
+      const actionWrap = createElement('div', { className: 'fleet-actions' });
+      const editBtn = createElement('button', {
+        type: 'button',
+        className: 'secondary small',
+        textContent: 'Edit',
+      });
+      editBtn.addEventListener('click', () => startFleetEdit(truck));
+      const deleteBtn = createElement('button', {
+        type: 'button',
+        className: 'ghost small',
+        textContent: 'Remove',
+      });
+      deleteBtn.addEventListener('click', () => removeFleet(truck.id));
+      actionWrap.append(editBtn, deleteBtn);
 
       row.append(
         createElement('div', { className: 'fleet-id', textContent: `${truck.id} · ${truck.type}` }),
@@ -938,19 +1035,11 @@ function renderFleet() {
         createElement('div', { className: 'muted', textContent: truck.location }),
         statusSelect,
         createElement('div', { className: 'muted', textContent: compliance }),
-        createElement('div', { className: 'fleet-actions', textContent: truck.status === 'available' ? 'Ready for call' : 'Active' }),
+        actionWrap,
       );
       container.appendChild(row);
     });
   });
-  const overviewLink = createElement('a', {
-    href: 'index.html',
-    className: 'button secondary',
-    textContent: 'Back to overview',
-  });
-  links.append(taskLink, ticketLink, overviewLink);
-
-  container.append(steps, links);
 }
 
 function renderJobs() {
@@ -1155,6 +1244,15 @@ function wireJobForm() {
 function wireFleetForm() {
   const form = document.querySelector('#addFleetForm');
   if (!form) return;
+  form.dataset.mode = 'create';
+
+  const cancelBtn = form.querySelector('.cancel-fleet-edit');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      resetFleetForm();
+    });
+  }
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -1172,14 +1270,25 @@ function wireFleetForm() {
       location: data.location.trim(),
       compliance: compliance.length ? compliance : ['CVSE'],
     };
-    state.fleet.unshift(truck);
-    addActivity(`${truck.id} added with ${truck.operator}`);
+
+    if (form.dataset.mode === 'edit' && editingTruckId) {
+      const idx = state.fleet.findIndex((t) => t.id === editingTruckId);
+      if (idx >= 0) {
+        state.fleet[idx] = truck;
+      } else {
+        state.fleet.unshift(truck);
+      }
+      addActivity(`${truck.id} updated for ${truck.operator}`);
+    } else {
+      state.fleet.unshift(truck);
+      addActivity(`${truck.id} added with ${truck.operator}`);
+    }
     persistState();
     renderFleet();
     renderDispatchTasks();
     renderSnapshot();
     renderWorkflowBoard();
-    form.reset();
+    resetFleetForm();
   });
 }
 
@@ -1263,6 +1372,9 @@ function wireControls() {
       renderWorkflowBoard();
     });
   });
+
+  const clearButtons = document.querySelectorAll('.clear-roster');
+  clearButtons.forEach((btn) => btn.addEventListener('click', () => clearRoster()));
 
   const invoiceStatusButtons = document.querySelectorAll('.mark-invoiced, .mark-paid');
   invoiceStatusButtons.forEach((btn) => {
